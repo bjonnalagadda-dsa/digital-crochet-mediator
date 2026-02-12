@@ -1,2 +1,14 @@
-# digital-crochet-mediator
-Our project is a multimodal training assistive tool for beginner crocheters. The tool takes an existing crochet pattern and creates a visual and textual representation of what the pattern’s instructions dictate.
+# Digital Crochet Mediator (HCI Project)
+
+A multimodal assistive tool for beginner crocheters.
+Upload a crochet pattern, tap unfamiliar stitch terms, and get a definition + short tutorial video.
+Includes progress tracking (checkpoints).
+
+## Repo Structure
+- `mobile/` — React Native app
+- `backend/` — Python API + NLP parsing
+- `docs/` — design + evaluation plan
+- `assets/` — screenshots, diagrams
+
+## Status
+Scaffolding in progress.
