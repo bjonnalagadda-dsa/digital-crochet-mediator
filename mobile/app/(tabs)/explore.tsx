@@ -1,112 +1,238 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import React, { useCallback } from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { usePatternContext } from "../../hooks/PatternContext";
 
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+function formatDate(ts: number): string {
+  return new Date(ts).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
-export default function TabTwoScreen() {
+function ProgressBar({ current, total }: { current: number; total: number }) {
+  if (total === 0) return null;
+  const pct = Math.round(((current + 1) / total) * 100);
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <View style={styles.progressTrack}>
+      <View style={[styles.progressFill, { width: `${pct}%` as any }]} />
+    </View>
+  );
+}
+
+export default function LibraryScreen() {
+  const { library, activeId, setActiveId, deletePattern } = usePatternContext();
+  const insets = useSafeAreaInsets();
+
+  const handleContinue = useCallback(
+    (id: string) => {
+      setActiveId(id);
+      router.navigate("/(tabs)/");
+    },
+    [setActiveId]
+  );
+
+  return (
+    <SafeAreaView style={styles.root} edges={["bottom", "left", "right"]}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <Text style={styles.title}>Library</Text>
+        <Text style={styles.subtitle}>
+          {library.length === 0
+            ? "No patterns yet"
+            : `${library.length} pattern${library.length === 1 ? "" : "s"}`}
+        </Text>
+      </View>
+
+      {library.length === 0 ? (
+        <View style={styles.empty}>
+          <Ionicons name="bookmarks-outline" size={52} color="rgba(255,255,255,0.15)" />
+          <Text style={styles.emptyTitle}>No saved patterns yet</Text>
+          <Text style={styles.emptySub}>
+            Upload a crochet pattern PDF from the Pattern tab and it will appear here.
+          </Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.list}>
+          {library.map((pattern) => {
+            const isActive = pattern.id === activeId;
+            const hasSteps = pattern.steps.length > 0;
+
+            return (
+              <Pressable
+                key={pattern.id}
+                style={[styles.card, isActive && styles.cardActive]}
+                onPress={() => handleContinue(pattern.id)}
+              >
+                {/* Active indicator */}
+                {isActive && <View style={styles.activeBar} />}
+
+                <View style={styles.cardBody}>
+                  {/* Top row: name + delete */}
+                  <View style={styles.cardHeader}>
+                    <View style={styles.cardTitleRow}>
+                      <Ionicons
+                        name="document-text-outline"
+                        size={16}
+                        color={isActive ? "#2ec4b6" : "rgba(255,255,255,0.5)"}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text style={[styles.cardName, isActive && styles.cardNameActive]} numberOfLines={1}>
+                        {pattern.name}
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={styles.deleteBtn}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        deletePattern(pattern.id);
+                      }}
+                      hitSlop={8}
+                    >
+                      <Ionicons name="trash-outline" size={16} color="rgba(255,80,80,0.7)" />
+                    </Pressable>
+                  </View>
+
+                  {/* Date + step count */}
+                  <Text style={styles.cardMeta}>
+                    Added {formatDate(pattern.addedAt)}
+                    {hasSteps
+                      ? `  ·  Step ${pattern.currentStepIndex + 1} of ${pattern.steps.length}`
+                      : pattern.detectedTerms.length > 0
+                      ? `  ·  ${pattern.detectedTerms.length} terms`
+                      : "  ·  Not yet analysed"}
+                  </Text>
+
+                  {/* Progress bar (only when steps exist) */}
+                  {hasSteps && (
+                    <ProgressBar
+                      current={pattern.currentStepIndex}
+                      total={pattern.steps.length}
+                    />
+                  )}
+
+                  {/* Continue label */}
+                  <View style={styles.continueRow}>
+                    <Text style={[styles.continueLabel, isActive && styles.continueLabelActive]}>
+                      {isActive ? "Currently open" : "Tap to continue"}
+                    </Text>
+                    {!isActive && (
+                      <Ionicons name="arrow-forward" size={13} color="rgba(255,255,255,0.3)" />
+                    )}
+                  </View>
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  root: { flex: 1, backgroundColor: "#0b1220" },
+
+  header: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.08)",
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  title: { color: "white", fontSize: 22, fontWeight: "800", marginBottom: 2 },
+  subtitle: { color: "rgba(255,255,255,0.4)", fontSize: 13 },
+
+  empty: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 32,
+    gap: 12,
   },
+  emptyTitle: { color: "rgba(255,255,255,0.55)", fontSize: 16, fontWeight: "700" },
+  emptySub: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+  },
+
+  list: { padding: 16, gap: 12 },
+
+  card: {
+    backgroundColor: "#0d1a2e",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.07)",
+    flexDirection: "row",
+    overflow: "hidden",
+  },
+  cardActive: {
+    borderColor: "rgba(46,196,182,0.35)",
+    backgroundColor: "#0e1f32",
+  },
+
+  activeBar: {
+    width: 3,
+    backgroundColor: "#2ec4b6",
+  },
+
+  cardBody: { flex: 1, padding: 14 },
+
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
+  },
+  cardTitleRow: { flexDirection: "row", alignItems: "center", flex: 1, marginRight: 8 },
+  cardName: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 14,
+    fontWeight: "700",
+    flex: 1,
+  },
+  cardNameActive: { color: "white" },
+
+  deleteBtn: {
+    padding: 4,
+  },
+
+  cardMeta: {
+    color: "rgba(255,255,255,0.35)",
+    fontSize: 12,
+    marginBottom: 8,
+  },
+
+  progressTrack: {
+    height: 3,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 2,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#2ec4b6",
+    borderRadius: 2,
+  },
+
+  continueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  continueLabel: {
+    color: "rgba(255,255,255,0.3)",
+    fontSize: 12,
+  },
+  continueLabelActive: { color: "#2ec4b6" },
 });
