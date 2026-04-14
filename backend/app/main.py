@@ -20,7 +20,7 @@ TERM_RE = re.compile(
     re.IGNORECASE,
 )
 
-STEP_RE = re.compile(r"^(round|rnd|row|rows)\s*\d+[:\)]", re.IGNORECASE)
+STEP_RE = re.compile(r"^(round|rnd|row)\s*\d+\b", re.IGNORECASE)
 
 # ── Wizard of Oz WebSocket manager ──────────────────────────────────────────
 
@@ -92,7 +92,9 @@ async def parse_file(file: UploadFile = File(...)):
     doc = fitz.open(stream=data, filetype="pdf")
     text = "\n".join([page.get_text() for page in doc])
 
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    # Strip Unicode garbage chars (narrow no-break spaces, zero-width chars, etc.)
+    clean = re.sub(r"[\u00e2\u20ac\u2039\u200b\u00a0\ufeff]", " ", text)
+    lines = [ln.strip() for ln in clean.splitlines() if ln.strip()]
 
     # Unique terms across full document
     found_terms = []
@@ -121,36 +123,47 @@ async def parse_file(file: UploadFile = File(...)):
                 "tutorial_url": "",
             })
 
-    # Step extraction
-    steps = []
+    # Step extraction — accumulate continuation lines into each step
+    raw_steps: list[str] = []
+    current: list[str] = []
     for ln in lines:
-        if STEP_RE.search(ln):
-            step_terms = []
-            for m in TERM_RE.finditer(ln):
-                term = re.sub(r"\s+", " ", m.group(0).lower().strip())
-                step_terms.append(term)
+        if STEP_RE.match(ln):
+            if current:
+                raw_steps.append(" ".join(current))
+            current = [ln]
+        elif current:
+            current.append(ln)
+    if current:
+        raw_steps.append(" ".join(current))
 
-            step_terms = sorted(set(step_terms))
+    steps = []
+    for step_text in raw_steps:
+        step_terms = []
+        for m in TERM_RE.finditer(step_text):
+            term = re.sub(r"\s+", " ", m.group(0).lower().strip())
+            step_terms.append(term)
 
-            steps.append({
-                "text": ln,
-                "terms": step_terms,
-                "term_details": [
-                    {
-                        "term": t,
-                        **(
-                            lookup_stitch(t)
-                            if lookup_stitch(t)
-                            else {
-                                "title": t.upper(),
-                                "definition": "Definition not added yet.",
-                                "tutorial_url": "",
-                            }
-                        ),
-                    }
-                    for t in step_terms
-                ],
-            })
+        step_terms = sorted(set(step_terms))
+
+        steps.append({
+            "text": step_text,
+            "terms": step_terms,
+            "term_details": [
+                {
+                    "term": t,
+                    **(
+                        lookup_stitch(t)
+                        if lookup_stitch(t)
+                        else {
+                            "title": t.upper(),
+                            "definition": "Definition not added yet.",
+                            "tutorial_url": "",
+                        }
+                    ),
+                }
+                for t in step_terms
+            ],
+        })
 
     return {
         "filename": file.filename,
@@ -158,6 +171,8 @@ async def parse_file(file: UploadFile = File(...)):
         "stitch_details": stitch_details,
         "steps": steps[:50],
         "text_preview": text[:800],
+        "debug_line_count": len(lines),
+        "debug_first_lines": lines[:10],
     }
 
 
