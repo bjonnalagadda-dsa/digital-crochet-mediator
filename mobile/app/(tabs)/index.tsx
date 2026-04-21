@@ -21,6 +21,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { WebView } from "react-native-webview";
 import BottomSheet, { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { Ionicons } from "@expo/vector-icons";
+import { Audio } from "expo-av";
 import { usePatternContext } from "../../hooks/PatternContext";
 import { type StitchInfo, persistPdf } from "@/hooks/usePatternStorage";
 import { useWizardControl } from "@/hooks/useWizardControl";
@@ -455,7 +456,9 @@ export default function HomeScreen() {
     isConnected: wizConnected,
     error: wizError,
     toggle: toggleWiz,
-  } = useWizardControl({ onCommand: (cmd) => voiceCommandRef.current(cmd) });
+  } = useWizardControl({
+    onCommand: (cmd) => voiceCommandRef.current(cmd === "back" ? "previous" : cmd),
+  });
 
   const {
     store: masteryStore,
@@ -465,6 +468,28 @@ export default function HomeScreen() {
   } = useTermMastery();
 
   const tappedInStep = useRef<Set<string>>(new Set());
+
+  const askMicPermission = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      console.log("mic permission:", permission);
+  
+      if (!permission.granted) {
+        alert("Microphone permission denied");
+        return;
+      }
+  
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+  
+      alert("Microphone enabled");
+    } catch (e) {
+      console.log("Mic permission/setup error:", e);
+      alert("Microphone unavailable");
+    }
+  };
 
   const insets = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheet>(null);
@@ -583,20 +608,22 @@ export default function HomeScreen() {
       setAnalysing(true);
 
       try {
-        const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-        console.log("[Backend] API_URL =", apiUrl);
+        const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
+        console.log("[Backend] API_URL =", API_URL);
         const form = new FormData();
         form.append("file", {
           uri: permanentUri,
           name: file.name ?? "pattern.pdf",
           type: "application/pdf",
         } as any);
-        const resp = await fetch(`${apiUrl}/parse-file`, {
+        const resp = await fetch(`${API_URL}/parse-file`, {
           method: "POST",
           body: form,
         });
         if (resp.ok) {
           const json = await resp.json();
+          console.log("PARSE RESULT:", json);
+          console.log("STEPS FROM BACKEND:", json.steps);
           const map: Record<string, StitchInfo> = {};
           for (const d of json.stitch_details ?? []) {
             map[d.term] = {
@@ -688,6 +715,7 @@ export default function HomeScreen() {
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <Text style={styles.title}>Digital Crochet Mediator</Text>
+
         <View style={styles.headerActions}>
           <Pressable
             style={[styles.btn, styles.btnPrimary]}
@@ -697,6 +725,14 @@ export default function HomeScreen() {
               Upload PDF
             </Text>
           </Pressable>
+
+          <Pressable
+            style={[styles.btn, styles.btnSecondary]}
+            onPress={askMicPermission}
+          >
+            <Text style={styles.btnText}>Enable Mic</Text>
+          </Pressable>
+
           {pdfUri && (
             <Pressable
               style={[styles.btn, styles.btnSecondary]}

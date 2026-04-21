@@ -51,14 +51,22 @@ manager = ConnectionManager()
 
 @app.websocket("/ws/control")
 async def ws_control(websocket: WebSocket):
-    """Phone clients connect here to receive next/previous commands."""
-    await manager.connect(websocket)
+    await websocket.accept()
     try:
         while True:
-            # Keep alive — we don't expect messages from the phone
-            await websocket.receive_text()
+            data = await websocket.receive_text()
+            print("RAW WS DATA:", repr(data))
+
+            text = data.strip().lower()
+
+            if "next" in text:
+                await websocket.send_json({"action": "next"})
+            elif "back" in text or "previous" in text or "prev" in text:
+                await websocket.send_json({"action": "back"})
+            else:
+                await websocket.send_json({"action": "unknown", "heard": data})
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        print("WebSocket disconnected")
 
 
 @app.get("/control", response_class=HTMLResponse)
